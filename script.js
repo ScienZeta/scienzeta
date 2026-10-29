@@ -63,60 +63,246 @@ function updateDashboard() {
 updateDashboard();
 document.getElementById('adminInfo').addEventListener('click', () => document.getElementById('setup').scrollIntoView({behavior:'smooth'}));
 
- const questions = [];
-let current=0, answers={}, started=false;
+const questions = [];
+
+let current = 0;
+let answers = {};
+let started = false;
+let finished = false;
+let timeLeft = 20 * 60;
+let timerId = null;
+
 const $ = id => document.getElementById(id);
+
 function drawQuestion() {
-  const q=questions[current];
-  $('qNumber').textContent=`प्रश्न ${current+1} / ${questions.length}`;
-  $('qProgress').textContent=`${Math.round((Object.keys(answers).length/questions.length)*100)}% पूरा`;
-  $('quizBar').style.width=`${Object.keys(answers).length/questions.length*100}%`;
-  $('qText').textContent=q.q; $('qOptions').innerHTML=''; $('qFeedback').textContent='';
-  q.options.forEach((opt,i)=>{
-    const b=document.createElement('button'); b.className='qOption'; b.textContent=`${String.fromCharCode(65+i)}. ${opt}`;
-    if (answers[current] !== undefined) {
-      b.disabled=true;
-      if(i===q.answer)b.classList.add('correct');
-      if(i===answers[current]&&i!==q.answer)b.classList.add('wrong');
+  if (!questions.length) return;
+
+  const q = questions[current];
+  const answeredCount = Object.keys(answers).length;
+
+  $('qNumber').textContent =
+    `प्रश्न ${current + 1} / ${questions.length}`;
+
+  $('qProgress').textContent =
+    `हल किए: ${answeredCount}/${questions.length} | समय: ${formatTime(timeLeft)}`;
+
+  $('quizBar').style.width =
+    `${answeredCount / questions.length * 100}%`;
+
+  $('qText').textContent = q.q;
+  $('qOptions').innerHTML = '';
+  $('qFeedback').textContent = '';
+
+  q.options.forEach((opt, i) => {
+    const b = document.createElement('button');
+    b.className = 'qOption';
+    b.textContent = `${String.fromCharCode(65 + i)}. ${opt}`;
+
+    b.disabled = !started || finished;
+
+    if (answers[current] === i) {
+      b.style.border = '2px solid #2563eb';
     }
-    b.addEventListener('click',()=>{answers[current]=i;drawQuestion();$('qFeedback').textContent=(i===q.answer?'सही जवाब! ':'सही उत्तर: '+q.options[q.answer]+'. ')+q.explain;});
+
+    b.addEventListener('click', () => {
+      if (!started || finished) return;
+
+      answers[current] = i;
+      drawQuestion();
+    });
+
     $('qOptions').appendChild(b);
   });
-  if(answers[current]!==undefined)$('qFeedback').textContent=(answers[current]===q.answer?'सही जवाब! ':'सही उत्तर: '+q.options[q.answer]+'. ')+q.explain;
-  $('prevQ').disabled=current===0;
-  $('nextQ').hidden=current===questions.length-1;
-  $('nextQ').disabled=answers[current]===undefined;
-  $('submitTest').hidden=current!==questions.length-1;
-  $('submitTest').disabled=Object.keys(answers).length!==questions.length;
-  $('result').hidden=true;
+
+  $('prevQ').disabled = !started || current === 0 || finished;
+  $('nextQ').hidden = current === questions.length - 1;
+  $('nextQ').disabled = !started || finished;
+
+  $('submitTest').hidden =
+    !started || current !== questions.length - 1;
+
+  $('submitTest').disabled = !started || finished;
+  $('result').hidden = true;
 }
-$('startTest').addEventListener('click',()=>{started=true;current=0;answers={};$('result').hidden=true;drawQuestion();$('qText').scrollIntoView({behavior:'smooth',block:'center'});});
-$('prevQ').addEventListener('click',()=>{if(current>0){current--;drawQuestion();}});
-$('nextQ').addEventListener('click',()=>{if(current<questions.length-1){current++;drawQuestion();}});
-$('submitTest').addEventListener('click',()=>{
-  let score=questions.reduce((sum,q,i)=>sum+(answers[i]===q.answer?1:0),0);
-  let history=JSON.parse(localStorage.getItem('sz_demo_results')||'[]');
-  history.push({date:new Date().toISOString(),score,total:questions.length});
-  localStorage.setItem('sz_demo_results',JSON.stringify(history));
-  $('attempts').textContent=history.length;
-  $('bestScore').textContent=Math.max(...history.map(x=>x.score))+'/'+questions.length;
-  $('result').hidden=false;
-  $('result').innerHTML=`<h4>आपका रिज़ल्ट: ${score} / ${questions.length}</h4><p>${Math.round(score/questions.length*100)}% अंक। ${score===questions.length?'बहुत बढ़िया!':score>=2?'अच्छा प्रयास—गलत प्रश्न दोहराएँ।':'चिंता न करें—नोट्स पढ़कर फिर प्रयास करें।'} यह रिज़ल्ट इसी ब्राउज़र में सेव हुआ है।</p>`;
-  $('result').scrollIntoView({behavior:'smooth',block:'nearest'});
+
+function formatTime(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+
+  return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function startTimer() {
+  clearInterval(timerId);
+  timeLeft = 20 * 60;
+
+  timerId = setInterval(() => {
+    if (finished) {
+      clearInterval(timerId);
+      return;
+    }
+
+    timeLeft--;
+    $('qProgress').textContent =
+      `हल किए: ${Object.keys(answers).length}/${questions.length} | समय: ${formatTime(timeLeft)}`;
+
+    if (timeLeft <= 0) {
+      finishTest(true);
+    }
+  }, 1000);
+}
+
+$('startTest').addEventListener('click', () => {
+  if (!questions.length) return;
+
+  current = 0;
+  answers = {};
+  started = true;
+  finished = false;
+
+  $('result').hidden = true;
+  startTimer();
+  drawQuestion();
+
+  $('qText').scrollIntoView({
+    behavior: 'smooth',
+    block: 'center'
+  });
 });
-$('attempts').textContent=(JSON.parse(localStorage.getItem('sz_demo_results')||'[]')).length;
-const oldResults=JSON.parse(localStorage.getItem('sz_demo_results')||'[]');
-if(oldResults.length)$('bestScore').textContent=Math.max(...oldResults.map(x=>x.score))+'/'+questions.length;
+
+$('prevQ').addEventListener('click', () => {
+  if (started && !finished && current > 0) {
+    current--;
+    drawQuestion();
+  }
+});
+
+$('nextQ').addEventListener('click', () => {
+  if (started && !finished && current < questions.length - 1) {
+    current++;
+    drawQuestion();
+  }
+});
+
+$('submitTest').addEventListener('click', () => {
+  finishTest(false);
+});
+
+function finishTest(autoSubmitted) {
+  if (!started || finished || !questions.length) return;
+
+  finished = true;
+  started = false;
+  clearInterval(timerId);
+
+  const score = questions.reduce(
+    (sum, q, i) => sum + (answers[i] === q.answer ? 1 : 0),
+    0
+  );
+
+  const history = JSON.parse(
+    localStorage.getItem('sz_demo_results') || '[]'
+  );
+
+  history.push({
+    date: new Date().toISOString(),
+    score,
+    total: questions.length
+  });
+
+  localStorage.setItem('sz_demo_results', JSON.stringify(history));
+
+  $('attempts').textContent = history.length;
+  $('bestScore').textContent =
+    Math.max(...history.map(x => x.score)) + '/' + questions.length;
+
+  $('result').hidden = false;
+  $('result').innerHTML = `
+    <h4>आपका रिज़ल्ट: ${score} / ${questions.length}</h4>
+    <p>${Math.round(score / questions.length * 100)}% अंक।</p>
+    <p>${autoSubmitted ? 'समय पूरा होने पर परीक्षा जमा हुई।' : 'आपकी परीक्षा जमा हो गई।'}</p>
+    <p>सही उत्तर नीचे देखें।</p>
+  `;
+
+  const reviewTitle = document.createElement('h4');
+  reviewTitle.textContent = 'उत्तर समीक्षा';
+  $('result').appendChild(reviewTitle);
+
+  questions.forEach((q, i) => {
+    const item = document.createElement('div');
+    item.style.padding = '12px 0';
+    item.style.borderBottom = '1px solid #ddd';
+
+    const questionText = document.createElement('p');
+    questionText.textContent = `${i + 1}. ${q.q}`;
+
+    const yourAnswer = document.createElement('p');
+    yourAnswer.textContent = answers[i] === undefined
+      ? 'आपका उत्तर: नहीं दिया'
+      : `आपका उत्तर: ${q.options[answers[i]]}`;
+
+    const correctAnswer = document.createElement('p');
+    correctAnswer.textContent =
+      `सही उत्तर: ${q.options[q.answer]}`;
+
+    const explanation = document.createElement('p');
+    explanation.textContent = q.explain || '';
+
+    item.append(questionText, yourAnswer, correctAnswer, explanation);
+    $('result').appendChild(item);
+  });
+
+  $('result').scrollIntoView({
+    behavior: 'smooth',
+    block: 'start'
+  });
+
+  $('qProgress').textContent = 'परीक्षा पूरी हुई';
+  $('quizBar').style.width = '100%';
+
+  $('prevQ').disabled = true;
+  $('nextQ').disabled = true;
+  $('submitTest').disabled = true;
+}
+
+$('attempts').textContent = (
+  JSON.parse(localStorage.getItem('sz_demo_results') || '[]')
+).length;
+
+const oldResults = JSON.parse(
+  localStorage.getItem('sz_demo_results') || '[]'
+);
+
+if (oldResults.length) {
+  $('bestScore').textContent =
+    Math.max(...oldResults.map(x => x.score)) + '/' +
+    (oldResults[oldResults.length - 1].total || questions.length);
+}
+
 fetch('./questions.json')
   .then(response => {
     if (!response.ok) {
-      throw new Error('Questions file नहीं मिली');
+      throw new Error('questions.json फाइल नहीं मिली');
     }
+
     return response.json();
   })
   .then(data => {
     if (!Array.isArray(data) || data.length === 0) {
-      throw new Error('Questions file खाली है');
+      throw new Error('Questions की सूची खाली है');
+    }
+
+    const validQuestions = data.every(q =>
+      typeof q.q === 'string' &&
+      Array.isArray(q.options) &&
+      q.options.length >= 2 &&
+      Number.isInteger(q.answer) &&
+      q.answer >= 0 &&
+      q.answer < q.options.length
+    );
+
+    if (!validQuestions) {
+      throw new Error('किसी सवाल का JSON format गलत है');
     }
 
     questions.push(...data);
@@ -124,6 +310,6 @@ fetch('./questions.json')
   })
   .catch(error => {
     $('qText').textContent =
-      'सवाल लोड नहीं हुए। questions.json फाइल जाँचें।';
+      'सवाल लोड नहीं हुए। questions.json की जाँच करें।';
     console.error(error);
   });
