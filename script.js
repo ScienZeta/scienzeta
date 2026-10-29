@@ -63,11 +63,7 @@ function updateDashboard() {
 updateDashboard();
 document.getElementById('adminInfo').addEventListener('click', () => document.getElementById('setup').scrollIntoView({behavior:'smooth'}));
 
-const questions = [
- {q:'बिहार की राजधानी कौन-सी है?', options:['गया','पटना','भागलपुर','मुजफ्फरपुर'], answer:1, explain:'पटना बिहार की राजधानी है।'},
- {q:'भारत का संविधान कब लागू हुआ?', options:['15 अगस्त 1947','26 जनवरी 1950','26 नवंबर 1949','2 अक्टूबर 1950'], answer:1, explain:'संविधान 26 जनवरी 1950 को लागू हुआ।'},
- {q:'पौधे अपना भोजन किस प्रक्रिया से बनाते हैं?', options:['श्वसन','वाष्पोत्सर्जन','प्रकाश संश्लेषण','पाचन'], answer:2, explain:'हरे पौधे सूर्य के प्रकाश की मदद से प्रकाश संश्लेषण करते हैं।'}
-];
+ const questions = [];
 let current=0, answers={}, started=false;
 const $ = id => document.getElementById(id);
 function drawQuestion() {
@@ -111,4 +107,23 @@ $('submitTest').addEventListener('click',()=>{
 $('attempts').textContent=(JSON.parse(localStorage.getItem('sz_demo_results')||'[]')).length;
 const oldResults=JSON.parse(localStorage.getItem('sz_demo_results')||'[]');
 if(oldResults.length)$('bestScore').textContent=Math.max(...oldResults.map(x=>x.score))+'/'+questions.length;
-drawQuestion();
+fetch('./questions.json')
+  .then(response => {
+    if (!response.ok) {
+      throw new Error('Questions file नहीं मिली');
+    }
+    return response.json();
+  })
+  .then(data => {
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error('Questions file खाली है');
+    }
+
+    questions.push(...data);
+    drawQuestion();
+  })
+  .catch(error => {
+    $('qText').textContent =
+      'सवाल लोड नहीं हुए। questions.json फाइल जाँचें।';
+    console.error(error);
+  });
