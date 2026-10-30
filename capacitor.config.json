@@ -1,0 +1,6 @@
+{
+  "appId": "com.scienzeta.app",
+  "appName": "ScienZeta",
+  "webDir": ".",
+  "bundledWebRuntime": false
+}
