@@ -14,33 +14,32 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Create Android Project
+        run: npx cap add android
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
-        with:
-          packages: 'platform-tools'
 
-      - name: Install Android SDK Packages
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-
-      - name: Verify Android Project
-        run: |
-          test -f android/settings.gradle || test -f android/settings.gradle.kts
-          test -f android/app/build.gradle || test -f android/app/build.gradle.kts
-
-      - name: Build APK
+      - name: Build Android APK
         working-directory: android
-        run: gradle --no-daemon assembleDebug
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
